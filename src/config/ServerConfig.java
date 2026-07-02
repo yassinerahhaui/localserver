@@ -4,14 +4,14 @@ import java.util.List;
 import java.util.Map;
 
 public class ServerConfig {
-    private String host;
-    private List<Integer> ports;
-    private String serverName;
-    private Boolean defaultServer;
-    private long clientMaxBodySize;
-    private int requestTimeout;
-    private Map<String, String> errorPages;
-    private List<RouteConfig> routes;
+    private final String host;
+    private final List<Integer> ports;
+    private final String serverName;
+    private final Boolean defaultServer;
+    private final long clientMaxBodySize;
+    private final int requestTimeout;
+    private final Map<String, String> errorPages;
+    private final List<RouteConfig> routes;
 
     public ServerConfig(String host, List<Integer> ports,
             String serverName, Boolean defaultServer,
