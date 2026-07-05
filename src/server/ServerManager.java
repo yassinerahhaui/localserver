@@ -3,11 +3,10 @@ package server;
 import config.ServerConfig;
 import config.ConfigLoader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-/**
- * Manages multiple server instances
- */
 public class ServerManager {
     private List<Server> servers;
     private List<Thread> threads;
@@ -24,28 +23,36 @@ public class ServerManager {
             throw new Exception("No servers configured");
         }
 
+        Map<Integer, List<ServerConfig>> portToConfigs = new HashMap<>();
+
         for (ServerConfig serverConfig : configLoader.getServers()) {
             for (Integer port : serverConfig.getPorts()) {
-                Server server = new Server(serverConfig, port);
-                servers.add(server);
-
-                Thread serverThread = new Thread(() -> {
-                    try {
-                        server.start();
-                    } catch (Exception e) {
-                        System.err.println("Server error on port " + port + ": " + e.getMessage());
-                        e.printStackTrace();
-                    }
-                });
-                serverThread.setName("Server-" + serverConfig.getServerName() + "-" + port);
-                serverThread.start();
-                threads.add(serverThread);
-
-                System.out.println("Started " + serverConfig.getServerName() + " on port " + port);
+                portToConfigs.computeIfAbsent(port, k -> new ArrayList<>()).add(serverConfig);
             }
         }
 
-        // Wait for all threads
+        for (Map.Entry<Integer, List<ServerConfig>> entry : portToConfigs.entrySet()) {
+            int port = entry.getKey();
+            List<ServerConfig> configsForPort = entry.getValue();
+
+            Server server = new Server(configsForPort, port);
+            servers.add(server);
+
+            Thread serverThread = new Thread(() -> {
+                try {
+                    server.start();
+                } catch (Exception e) {
+                    System.err.println("Server error on port " + port + ": " + e.getMessage());
+                }
+            });
+            
+            serverThread.setName("Server-Port-" + port);
+            serverThread.start();
+            threads.add(serverThread);
+
+            System.out.println("Started server listener on port " + port + " (" + configsForPort.size() + " virtual hosts)");
+        }
+
         for (Thread thread : threads) {
             thread.join();
         }

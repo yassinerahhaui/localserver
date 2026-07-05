@@ -6,6 +6,7 @@ import config.RouteConfig;
 
 import java.io.*;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class CgiHandler {
 
@@ -41,19 +42,17 @@ public class CgiHandler {
 
             ProcessBuilder pb = new ProcessBuilder(interpreter, scriptFile.getAbsolutePath());
 
-            // Set up environment variables
             Map<String, String> env = pb.environment();
             env.put("REQUEST_METHOD", request.getMethod());
             env.put("QUERY_STRING", extractQueryString(request.getUri()));
             env.put("PATH_INFO", request.getPath());
             env.put("SCRIPT_NAME", route.getPath());
             env.put("SERVER_NAME", "localhost");
-            env.put("SERVER_PORT", "8080");
+            env.put("SERVER_PORT", "8080"); 
             env.put("SERVER_PROTOCOL", request.getHttpVersion());
             env.put("CONTENT_LENGTH", String.valueOf(request.getBody().length));
             env.put("CONTENT_TYPE", request.getContentType() != null ? request.getContentType() : "");
 
-            // Pass HTTP headers as CGI variables
             for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
                 String cgVar = "HTTP_" + header.getKey().toUpperCase().replace("-", "_");
                 env.put(cgVar, header.getValue());
@@ -62,29 +61,44 @@ public class CgiHandler {
             pb.redirectErrorStream(true);
             Process process = pb.start();
 
-            // Write body if POST/PUT
             if (request.getBody().length > 0) {
-                OutputStream stdin = process.getOutputStream();
-                stdin.write(request.getBody());
-                stdin.close();
+                try (OutputStream stdin = process.getOutputStream()) {
+                    stdin.write(request.getBody());
+                }
             }
 
-            // Read output
             ByteArrayOutputStream result = new ByteArrayOutputStream();
-            InputStream stdout = process.getInputStream();
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = stdout.read(buffer)) != -1) {
-                result.write(buffer, 0, bytesRead);
-            }
+            try (InputStream stdout = process.getInputStream()) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                
+                boolean finished = false;
+                long endTime = System.currentTimeMillis() + 500; 
 
-            // Wait for process to finish (with timeout)
-            boolean finished = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
-            if (!finished) {
-                process.destroyForcibly();
-                response.setStatusCode(504);
-                response.setBody("Gateway Timeout");
-                return response;
+                while (System.currentTimeMillis() < endTime) {
+                    while (stdout.available() > 0 && (bytesRead = stdout.read(buffer)) != -1) {
+                        result.write(buffer, 0, bytesRead);
+                    }
+                    
+                    try {
+                        process.exitValue();
+                        finished = true;
+                        
+                        while ((bytesRead = stdout.read(buffer)) != -1) {
+                            result.write(buffer, 0, bytesRead);
+                        }
+                        break;
+                    } catch (IllegalThreadStateException e) {
+                        Thread.sleep(10);
+                    }
+                }
+
+                if (!finished) {
+                    process.destroyForcibly();
+                    response.setStatusCode(504);
+                    response.setBody("Gateway Timeout");
+                    return response;
+                }
             }
 
             int exitCode = process.exitValue();
@@ -94,17 +108,12 @@ public class CgiHandler {
                 return response;
             }
 
-            byte[] output = result.toByteArray();
-            
-            // Parse CGI response (should include headers)
-            parseCgiResponse(response, output);
-
+            parseCgiResponse(response, result.toByteArray());
             return response;
 
         } catch (Exception e) {
-            e.printStackTrace();
             response.setStatusCode(500);
-            response.setBody("Internal Server Error: " + e.getMessage());
+            response.setBody("Internal Server Error");
             return response;
         }
     }
@@ -120,22 +129,20 @@ public class CgiHandler {
             String headerPart = outputStr.substring(0, doubleNewlineIndex);
             String bodyPart = outputStr.substring(doubleNewlineIndex + 4);
 
-            // Parse headers
             String[] headerLines = headerPart.split("\r?\n");
             for (String line : headerLines) {
-                if (line.isEmpty()) continue;
+                if (line.trim().isEmpty()) continue;
                 int colonIndex = line.indexOf(':');
                 if (colonIndex > 0) {
                     String name = line.substring(0, colonIndex).trim();
                     String value = line.substring(colonIndex + 1).trim();
                     
                     if (name.equalsIgnoreCase("status")) {
-                        // Parse status like "200 OK"
                         String[] parts = value.split(" ", 2);
                         try {
                             response.setStatusCode(Integer.parseInt(parts[0]));
                         } catch (NumberFormatException e) {
-                            // Ignore
+                            // Proceed with default
                         }
                     } else if (name.equalsIgnoreCase("content-type")) {
                         response.setHeader("content-type", value);
@@ -144,10 +151,8 @@ public class CgiHandler {
                     }
                 }
             }
-
             response.setBody(bodyPart);
         } else {
-            // No headers, just body
             response.setStatusCode(200);
             response.setHeader("content-type", "text/plain");
             response.setBody(outputStr);
@@ -156,17 +161,11 @@ public class CgiHandler {
 
     private static String getFileExtension(String filename) {
         int lastDot = filename.lastIndexOf('.');
-        if (lastDot > 0) {
-            return filename.substring(lastDot);
-        }
-        return "";
+        return lastDot > 0 ? filename.substring(lastDot) : "";
     }
 
     private static String extractQueryString(String uri) {
         int questionIndex = uri.indexOf('?');
-        if (questionIndex >= 0) {
-            return uri.substring(questionIndex + 1);
-        }
-        return "";
+        return questionIndex >= 0 ? uri.substring(questionIndex + 1) : "";
     }
 }

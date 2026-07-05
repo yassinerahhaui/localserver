@@ -12,11 +12,10 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class Server {
-    private final ServerConfig config;
+    private final List<ServerConfig> configs;
     private final Router router;
     private Selector selector;
     private ServerSocketChannel serverSocketChannel;
@@ -26,10 +25,10 @@ public class Server {
 
     private static final int BUFFER_SIZE = 8192;
 
-    public Server(ServerConfig config, int port) {
-        this.config = config;
+    public Server(List<ServerConfig> configs, int port) {
+        this.configs = configs;
         this.port = port;
-        this.router = new Router(config);
+        this.router = new Router(configs);
         this.connections = new HashMap<>();
     }
 
@@ -37,11 +36,12 @@ public class Server {
         selector = Selector.open();
         serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.configureBlocking(false);
-        serverSocketChannel.socket().bind(new java.net.InetSocketAddress(config.getHost(), port));
+        
+        String bindHost = configs.get(0).getHost();
+        serverSocketChannel.socket().bind(new java.net.InetSocketAddress(bindHost, port));
         serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
 
         running = true;
-        System.out.println("Server started on " + config.getHost() + ":" + port);
 
         mainLoop();
     }
@@ -49,8 +49,7 @@ public class Server {
     private void mainLoop() {
         while (running) {
             try {
-                // Select ready channels
-                int readyChannels = selector.select(1000); // 1 second timeout
+                int readyChannels = selector.select(1000);
 
                 if (readyChannels == 0) {
                     cleanupTimedOutConnections();
@@ -77,7 +76,6 @@ public class Server {
                             handleWrite(key);
                         }
                     } catch (Exception e) {
-                        System.err.println("Error handling connection: " + e.getMessage());
                         closeConnection(key);
                     }
                 }
@@ -86,7 +84,6 @@ public class Server {
 
             } catch (IOException e) {
                 System.err.println("Selector error: " + e.getMessage());
-                e.printStackTrace();
             }
         }
 
@@ -98,11 +95,10 @@ public class Server {
         SocketChannel socketChannel = serverChannel.accept();
         socketChannel.configureBlocking(false);
 
-        ClientConnection conn = new ClientConnection(socketChannel, config.getRequestTimeout());
+        int timeout = configs.get(0).getRequestTimeout();
+        ClientConnection conn = new ClientConnection(socketChannel, timeout);
         connections.put(socketChannel, conn);
         socketChannel.register(selector, SelectionKey.OP_READ, conn);
-
-        System.out.println("New connection from " + socketChannel.getRemoteAddress());
     }
 
     private void handleRead(SelectionKey key) throws IOException {
@@ -110,39 +106,45 @@ public class Server {
         ClientConnection conn = (ClientConnection) key.attachment();
 
         ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
-        int bytesRead = socketChannel.read(buffer);
+        int bytesRead;
+        
+        try {
+            bytesRead = socketChannel.read(buffer);
+        } catch (IOException e) {
+            closeConnection(key);
+            return;
+        }
 
         if (bytesRead == -1) {
-            // Client closed connection
             closeConnection(key);
             return;
         }
 
         if (bytesRead > 0) {
-            conn.appendData(buffer.array(), bytesRead);
-            conn.updateLastActivity();
+            try {
+                conn.appendData(buffer.array(), bytesRead);
+                conn.updateLastActivity();
 
-            // Check if we have a complete request
-            if (conn.hasCompleteRequest()) {
-                try {
+                if (conn.hasCompleteRequest()) {
                     HttpRequest request = conn.parseRequest();
                     conn.clearBuffer();
 
-                    // Route request
                     HttpResponse response = router.route(request);
-
-                    // Send response
                     conn.setResponse(response);
                     socketChannel.register(selector, SelectionKey.OP_WRITE, conn);
-
-                } catch (Exception e) {
-                    System.err.println("Error parsing request: " + e.getMessage());
-                    HttpResponse errorResponse = new HttpResponse();
+                }
+            } catch (Exception e) {
+                HttpResponse errorResponse = new HttpResponse();
+                if (e.getMessage() != null && e.getMessage().contains("413")) {
+                    errorResponse.setStatusCode(413);
+                    errorResponse.setBody("Payload Too Large");
+                } else {
                     errorResponse.setStatusCode(400);
                     errorResponse.setBody("Bad Request");
-                    conn.setResponse(errorResponse);
-                    socketChannel.register(selector, SelectionKey.OP_WRITE, conn);
                 }
+                
+                conn.setResponse(errorResponse);
+                socketChannel.register(selector, SelectionKey.OP_WRITE, conn);
             }
         }
     }
@@ -151,20 +153,25 @@ public class Server {
         SocketChannel socketChannel = (SocketChannel) key.channel();
         ClientConnection conn = (ClientConnection) key.attachment();
 
-        HttpResponse response = conn.getResponse();
-        if (response == null) {
-            socketChannel.register(selector, SelectionKey.OP_READ, conn);
+        if (conn.getWriteBuffer() == null) {
+            HttpResponse response = conn.getResponse();
+            if (response == null) {
+                socketChannel.register(selector, SelectionKey.OP_READ, conn);
+                return;
+            }
+            conn.setWriteBuffer(ByteBuffer.wrap(response.toBytes()));
+        }
+
+        try {
+            socketChannel.write(conn.getWriteBuffer());
+        } catch (IOException e) {
+            closeConnection(key);
             return;
         }
 
-        byte[] responseBytes = response.toBytes();
-        ByteBuffer buffer = ByteBuffer.wrap(responseBytes);
-
-        int bytesWritten = socketChannel.write(buffer);
-
-        if (!buffer.hasRemaining()) {
-            // Response fully sent
+        if (!conn.getWriteBuffer().hasRemaining()) {
             conn.clearResponse();
+            conn.setWriteBuffer(null);
             socketChannel.register(selector, SelectionKey.OP_READ, conn);
         }
     }
@@ -172,18 +179,11 @@ public class Server {
     private void closeConnection(SelectionKey key) {
         try {
             SocketChannel socketChannel = (SocketChannel) key.channel();
-            ClientConnection conn = connections.remove(socketChannel);
-
+            connections.remove(socketChannel);
             socketChannel.close();
             key.cancel();
-            
-            try {
-                System.out.println("Connection closed: " + socketChannel.getRemoteAddress());
-            } catch (Exception e) {
-                System.out.println("Connection closed");
-            }
         } catch (IOException e) {
-            System.err.println("Error closing connection: " + e.getMessage());
+            // Suppress close exceptions
         }
     }
 
@@ -195,12 +195,11 @@ public class Server {
             Map.Entry<SocketChannel, ClientConnection> entry = iterator.next();
             ClientConnection conn = entry.getValue();
 
-            if (now - conn.getLastActivity() > config.getRequestTimeout()) {
-                System.out.println("Connection timeout: " + entry.getKey());
+            if (now - conn.getLastActivity() > conn.getRequestTimeout()) {
                 try {
                     entry.getKey().close();
                 } catch (IOException e) {
-                    // Ignore
+                    // Suppress close exceptions
                 }
                 iterator.remove();
             }
@@ -216,36 +215,32 @@ public class Server {
             serverSocketChannel.close();
             selector.close();
         } catch (IOException e) {
-            System.err.println("Error shutting down: " + e.getMessage());
+            // Suppress shutdown exceptions
         }
-        System.out.println("Server stopped");
     }
 
     public boolean isRunning() {
         return running;
     }
 
-    /**
-     * Inner class to track per-connection state
-     */
     private static class ClientConnection {
         private final SocketChannel channel;
         private final HttpParser parser;
         private long lastActivity;
         private final long requestTimeout;
         private HttpResponse response;
-        private boolean requestComplete;
+        private ByteBuffer writeBuffer;
 
-        public ClientConnection(SocketChannel channel, int requestTimeout) {
+        public ClientConnection(SocketChannel channel, long requestTimeout) {
             this.channel = channel;
             this.parser = new HttpParser();
             this.lastActivity = System.currentTimeMillis();
             this.requestTimeout = requestTimeout;
             this.response = null;
-            this.requestComplete = false;
+            this.writeBuffer = null;
         }
 
-        public void appendData(byte[] data, int length) {
+        public void appendData(byte[] data, int length) throws Exception {
             parser.appendData(data, length);
         }
 
@@ -269,6 +264,10 @@ public class Server {
             return lastActivity;
         }
 
+        public long getRequestTimeout() {
+            return requestTimeout;
+        }
+
         public void setResponse(HttpResponse response) {
             this.response = response;
         }
@@ -279,6 +278,14 @@ public class Server {
 
         public void clearResponse() {
             this.response = null;
+        }
+
+        public ByteBuffer getWriteBuffer() {
+            return writeBuffer;
+        }
+
+        public void setWriteBuffer(ByteBuffer writeBuffer) {
+            this.writeBuffer = writeBuffer;
         }
     }
 }

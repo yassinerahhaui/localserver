@@ -12,86 +12,90 @@ import java.util.List;
 import java.util.Map;
 
 public class Router {
-    private ServerConfig serverConfig;
+    private final List<ServerConfig> serverConfigs;
 
-    public Router(ServerConfig serverConfig) {
-        this.serverConfig = serverConfig;
+    public Router(List<ServerConfig> serverConfigs) {
+        this.serverConfigs = serverConfigs;
     }
 
     public HttpResponse route(HttpRequest request) {
+        ServerConfig activeServerConfig = resolveVirtualHost(request);
+        
         String path = request.getPath();
         String method = request.getMethod();
 
-        // Find matching route
-        RouteConfig matchedRoute = findMatchingRoute(path, method);
+        RouteConfig matchedRoute = findMatchingRoute(activeServerConfig, path);
 
         if (matchedRoute == null) {
-            return ErrorHandler.handleError(serverConfig, 404, "Route not found: " + path);
+            return ErrorHandler.handleError(activeServerConfig, 404, "Route not found: " + path);
         }
 
-        // Check if method is allowed
         if (!matchedRoute.getMethods().contains(method)) {
-            return ErrorHandler.handleError(serverConfig, 405, "Method " + method + " not allowed for " + path);
+            return ErrorHandler.handleError(activeServerConfig, 405, "Method " + method + " not allowed for " + path);
         }
 
-        // Handle redirects
         if (matchedRoute.isRedirect()) {
             return handleRedirect(matchedRoute);
         }
 
-        // Handle CGI
         if (matchedRoute.hasCgi()) {
             return CgiHandler.handleCgiRequest(request, matchedRoute, matchedRoute.getRoot());
         }
 
-        // Check content length
-        if (request.getContentLength() > matchedRoute.getClientMaxBodySize()) {
-            return ErrorHandler.handleError(serverConfig, 413, "Payload too large");
+        long activeMaxBodySize = matchedRoute.getClientMaxBodySize() > 0 
+                                 ? matchedRoute.getClientMaxBodySize() 
+                                 : activeServerConfig.getClientMaxBodySize();
+
+        if (activeMaxBodySize > 0 && request.getBody().length > activeMaxBodySize) {
+            return ErrorHandler.handleError(activeServerConfig, 413, "Payload too large");
         }
 
-        // Calculate relative path from route
         String relativePath = calculateRelativePath(path, matchedRoute.getPath());
 
-        // Handle based on HTTP method
         return switch (method) {
             case "GET" -> StaticFileHandler.handleRequest(request, matchedRoute.getRoot(), matchedRoute.getDefaultFile(), relativePath);
-            case "POST" -> handlePost(request, matchedRoute);
-            case "DELETE" -> handleDelete(request, matchedRoute);
+            case "POST" -> handlePost(request, matchedRoute, activeServerConfig);
+            case "DELETE" -> handleDelete(request, matchedRoute, activeServerConfig);
             case "HEAD" -> {
                 HttpResponse response = StaticFileHandler.handleRequest(request, matchedRoute.getRoot(), matchedRoute.getDefaultFile(), relativePath);
-                // For HEAD, return headers only (no body)
                 response.setBody(new byte[0]);
                 yield response;
             }
-            default -> ErrorHandler.handleError(serverConfig, 501, "Method not implemented");
+            default -> ErrorHandler.handleError(activeServerConfig, 501, "Method not implemented");
         };
     }
 
-    private String calculateRelativePath(String requestPath, String routePath) {
-        if (requestPath.equals(routePath)) {
-            // Exact match - return empty path to serve root
-            return "";
+    private ServerConfig resolveVirtualHost(HttpRequest request) {
+        String hostHeader = request.getHeader("host");
+        
+        if (hostHeader != null) {
+            String requestedHost = hostHeader.split(":")[0];
+            for (ServerConfig config : serverConfigs) {
+                if (config.getServerName() != null && config.getServerName().equals(requestedHost)) {
+                    return config;
+                }
+            }
         }
-        if (routePath.equals("/")) {
-            // Root route - return path as-is (without leading slash)
-            return requestPath.startsWith("/") ? requestPath.substring(1) : requestPath;
+
+        for (ServerConfig config : serverConfigs) {
+            if (config.getDefaultServer() != null && config.getDefaultServer()) {
+                return config;
+            }
         }
-        // Remove route prefix from request path
-        if (requestPath.startsWith(routePath + "/")) {
-            return requestPath.substring(routePath.length() + 1);
-        }
-        return "";
+
+        return serverConfigs.get(0);
     }
 
-    private RouteConfig findMatchingRoute(String path, String method) {
+    private RouteConfig findMatchingRoute(ServerConfig config, String path) {
         RouteConfig bestMatch = null;
         int bestMatchLength = 0;
 
-        List<RouteConfig> routes = serverConfig.getRoutes();
+        List<RouteConfig> routes = config.getRoutes();
+        if (routes == null) return null;
+
         for (RouteConfig route : routes) {
             String routePath = route.getPath();
             
-            // Exact match or prefix match
             if (path.equals(routePath)) {
                 return route;
             }
@@ -107,22 +111,27 @@ public class Router {
         return bestMatch;
     }
 
-    private HttpResponse handlePost(HttpRequest request, RouteConfig route) {
-        // Handle file upload
-        HttpResponse response = new HttpResponse();
-
-        if (!route.getMethods().contains("POST")) {
-            return ErrorHandler.handleError(serverConfig, 405, "POST not allowed");
+    private String calculateRelativePath(String requestPath, String routePath) {
+        if (requestPath.equals(routePath)) {
+            return "";
         }
+        if (routePath.equals("/")) {
+            return requestPath.startsWith("/") ? requestPath.substring(1) : requestPath;
+        }
+        if (requestPath.startsWith(routePath + "/")) {
+            return requestPath.substring(routePath.length() + 1);
+        }
+        return "";
+    }
+
+    private HttpResponse handlePost(HttpRequest request, RouteConfig route, ServerConfig config) {
+        HttpResponse response = new HttpResponse();
 
         byte[] body = request.getBody();
         if (body.length == 0) {
-            response.setStatusCode(400);
-            response.setBody("Empty request body");
-            return response;
+            return ErrorHandler.handleError(config, 400, "Empty request body");
         }
 
-        // Save file
         String filename = extractFilename(request.getHeader("content-disposition"));
         if (filename == null) {
             filename = "upload_" + System.currentTimeMillis();
@@ -135,19 +144,14 @@ public class Router {
             response.setBody("File uploaded successfully: " + filename);
             response.setHeader("content-type", "text/plain");
         } catch (Exception e) {
-            response.setStatusCode(500);
-            response.setBody("Upload failed: " + e.getMessage());
+            return ErrorHandler.handleError(config, 500, "Upload failed");
         }
 
         return response;
     }
 
-    private HttpResponse handleDelete(HttpRequest request, RouteConfig route) {
+    private HttpResponse handleDelete(HttpRequest request, RouteConfig route, ServerConfig config) {
         HttpResponse response = new HttpResponse();
-
-        if (!route.getMethods().contains("DELETE")) {
-            return ErrorHandler.handleError(serverConfig, 405, "DELETE not allowed");
-        }
 
         String path = request.getPath();
         if (path.startsWith(route.getPath())) {
@@ -158,10 +162,9 @@ public class Router {
         try {
             java.nio.file.Files.delete(java.nio.file.Paths.get(filePath));
             response.setStatusCode(204);
-            response.setBody("");
+            response.setBody(new byte[0]);
         } catch (Exception e) {
-            response.setStatusCode(404);
-            response.setBody("File not found");
+            return ErrorHandler.handleError(config, 404, "File not found");
         }
 
         return response;
