@@ -77,4 +77,9 @@ public class RouteConfig {
         }
         return cgi.get(extension);
     }
+
+    @Override
+    public String toString() {
+        return path + " " + methods;
+    }
 }

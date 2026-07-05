@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YRCode - Development & Programming Resources</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        nav {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        nav .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #61dafb;
+            text-decoration: none;
+            letter-spacing: 2px;
+        }
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-right: 2rem;
+            transition: color 0.3s;
+            font-size: 0.95rem;
+        }
+        nav a:hover {
+            color: #61dafb;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .hero {
+            background: white;
+            border-radius: 15px;
+            padding: 4rem;
+            margin: 2rem 0;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #1e3c72;
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .tagline {
+            font-size: 1.3rem;
+            color: #666;
+            margin-bottom: 2rem;
+            font-style: italic;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        .feature {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border-left: 4px solid #61dafb;
+        }
+        .feature:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+        }
+        .feature h3 {
+            color: #1e3c72;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+        .feature p {
+            color: #555;
+            line-height: 1.8;
+        }
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        .section h2 {
+            color: #1e3c72;
+            margin-bottom: 1.5rem;
+            font-size: 2rem;
+            border-bottom: 3px solid #61dafb;
+            padding-bottom: 0.5rem;
+        }
+        code {
+            background: #1e3c72;
+            color: #61dafb;
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            font-family: 'Courier New', 'Monaco', monospace;
+            font-weight: 500;
+            display: inline-block;
+        }
+        .code-block {
+            background: #1e3c72;
+            color: #61dafb;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Courier New', monospace;
+            border-left: 4px solid #61dafb;
+        }
+        .resources {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .resource-item {
+            background: #f0f4f8;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #2a5298;
+            transition: all 0.3s;
+        }
+        .resource-item:hover {
+            background: #e0e8f0;
+            transform: translateX(5px);
+        }
+        .resource-item h4 {
+            color: #1e3c72;
+            margin-bottom: 0.5rem;
+        }
+        .resource-item p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: white;
+            margin-top: 2rem;
+            border-top: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border-radius: 5px;
+            text-decoration: none;
+            margin-top: 1rem;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <a href="/" class="logo">▷ YRCode</a>
+            <div>
+                <a href="#about">About</a>
+                <a href="#resources">Resources</a>
+                <a href="#guides">Guides</a>
+                <a href="#contact">Contact</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="hero">
+            <h1>YRCode</h1>
+            <p class="tagline">Your Gateway to Modern Programming & Development</p>
+            
+            <div class="features">
+                <div class="feature">
+                    <h3>💻 Web Development</h3>
+                    <p>Master frontend and backend technologies with comprehensive tutorials and best practices</p>
+                </div>
+                <div class="feature">
+                    <h3>🔨 Tools & Frameworks</h3>
+                    <p>Learn the latest development tools, from React to Java, Docker to Kubernetes</p>
+                </div>
+                <div class="feature">
+                    <h3>📚 Knowledge Base</h3>
+                    <p>Access curated resources, documentation, and coding patterns for all skill levels</p>
+                </div>
+                <div class="feature">
+                    <h3>🚀 Best Practices</h3>
+                    <p>Industry-standard approaches to architecture, security, performance, and scalability</p>
+                </div>
+                <div class="feature">
+                    <h3>🧪 Code Examples</h3>
+                    <p>Production-ready code samples and implementations across multiple languages</p>
+                </div>
+                <div class="feature">
+                    <h3>🎓 Learning Path</h3>
+                    <p>Structured learning paths from beginner to advanced developer skills</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section" id="about">
+            <h2>About YRCode</h2>
+            <p>YRCode is a comprehensive platform dedicated to helping developers at all levels master modern programming concepts and technologies. We provide in-depth tutorials, practical examples, and expert guidance across multiple programming languages and frameworks.</p>
+            <p style="margin-top: 1rem;">Whether you're just starting your coding journey or you're an experienced developer looking to expand your skills, YRCode offers resources tailored to your needs.</p>
+        </div>
+
+        <div class="section" id="resources">
+            <h2>Popular Resources</h2>
+            <div class="resources">
+                <div class="resource-item">
+                    <h4>Java Fundamentals</h4>
+                    <p>Core concepts, OOP principles, and best practices for Java development</p>
+                </div>
+                <div class="resource-item">
+                    <h4>Web Technologies</h4>
+                    <p>HTML, CSS, JavaScript, and modern frameworks for web development</p>
+                </div>
+                <div class="resource-item">
+                    <h4>Database Design</h4>
+                    <p>SQL, NoSQL, schema design, and optimization techniques</p>
+                </div>
+                <div class="resource-item">
+                    <h4>API Development</h4>
+                    <p>RESTful APIs, GraphQL, authentication, and API best practices</p>
+                </div>
+                <div class="resource-item">
+                    <h4>DevOps & Cloud</h4>
+                    <p>Docker, Kubernetes, CI/CD, and cloud deployment strategies</p>
+                </div>
+                <div class="resource-item">
+                    <h4>System Design</h4>
+                    <p>Scalable architecture, microservices, and distributed systems</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section" id="guides">
+            <h2>Quick Start Guides</h2>
+            
+            <h3 style="color: #1e3c72; margin-top: 1.5rem; margin-bottom: 1rem;">Getting Started with This Server</h3>
+            <p>This server is built with Java NIO for high-performance non-blocking I/O. Here's how to get started:</p>
+            
+            <p style="margin-top: 1rem;"><strong>Build the project:</strong></p>
+            <div class="code-block">javac -d bin src/**/*.java</div>
+            
+            <p style="margin-top: 1rem;"><strong>Run the server:</strong></p>
+            <div class="code-block">java -cp bin Main config.json</div>
+            
+            <p style="margin-top: 1rem;"><strong>Access the server:</strong></p>
+            <div class="code-block">curl http://localhost:8080</div>
+
+            <p style="margin-top: 1.5rem;"><strong>Key Features:</strong></p>
+            <ul style="margin-left: 2rem; margin-top: 1rem;">
+                <li>Non-blocking I/O with Java NIO Selector</li>
+                <li>Configuration-based routing</li>
+                <li>Static file serving with MIME type detection</li>
+                <li>CGI script execution (Python, Bash)</li>
+                <li>Session and cookie management</li>
+                <li>Custom error pages</li>
+                <li>Multi-port and multi-server support</li>
+                <li>Admin dashboard with metrics</li>
+            </ul>
+        </div>
+
+        <div class="section" id="contact">
+            <h2>Get Connected</h2>
+            <p>Stay updated with the latest programming tutorials, best practices, and development resources.</p>
+            <p style="margin-top: 1rem;">
+                <strong>For questions or feedback:</strong> Feel free to explore the resources on this server and check out the admin dashboard at <code>/admin</code>
+            </p>
+            <p style="margin-top: 1rem;">
+                <strong>Server Status:</strong> Access the status endpoint at <code>/api/status</code> for real-time server metrics and health information.
+            </p>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 YRCode - Your Resource for Code. All rights reserved.</p>
+        <p style="font-size: 0.9rem; margin-top: 0.5rem;">Powered by Custom Java HTTP Server</p>
+    </footer>
+</body>
+</html>

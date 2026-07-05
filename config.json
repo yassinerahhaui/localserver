@@ -27,6 +27,7 @@
           "path": "/upload",
           "methods": ["GET", "POST", "DELETE"],
           "root": "./uploads",
+          "default_file": "index.html",
           "directory_listing": true,
           "client_max_body_size": "50MB"
         },
@@ -57,7 +58,15 @@
       "client_max_body_size": "1MB",
       "request_timeout_ms": 15000,
       "error_pages": {},
-      "routes": []
+      "routes": [
+        {
+          "path": "/",
+          "methods": ["GET"],
+          "root": "./www/yrcode.com",
+          "default_file": "index.html",
+          "directory_listing": false
+        }
+      ]
     }
   ]
 }

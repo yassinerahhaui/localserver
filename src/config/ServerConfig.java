@@ -28,6 +28,8 @@ public class ServerConfig {
         this.routes = routes;
     }
 
+    /*------------ Getters ------------*/
+
     public String getHost() {
         return host;
     }
@@ -58,6 +60,13 @@ public class ServerConfig {
 
     public List<RouteConfig> getRoutes() {
         return routes;
+    }
+
+    /*------------ Helpers ------------*/
+    
+    @Override
+    public String toString() {
+        return serverName + " (" + host + ":" + ports + ")";
     }
 
 }
