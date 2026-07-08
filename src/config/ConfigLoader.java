@@ -13,6 +13,11 @@ public class ConfigLoader {
     public static ConfigLoader fromFile(String filePath) throws IOException {
         ConfigLoader loader = new ConfigLoader();
         loader.load(filePath);
+        try {
+            loader.validate();
+        } catch (Exception e) {
+            throw new IOException("Configuration validation failed: " + e.getMessage(), e);
+        }
         return loader;
     }
 
@@ -136,5 +141,70 @@ public class ConfigLoader {
             }
         }
         return servers.isEmpty() ? null : servers.get(0);
+    }
+
+    public void validate() throws Exception {
+        if (servers.isEmpty()) {
+            throw new Exception("No servers configured");
+        }
+
+        Set<String> serverKeys = new HashSet<>();
+        Map<Integer, Boolean> portHasDefault = new HashMap<>();
+
+        for (ServerConfig server : servers) {
+            if (server.getHost() == null || server.getHost().trim().isEmpty()) {
+                throw new Exception("Server host cannot be empty");
+            }
+            if (server.getPorts() == null || server.getPorts().isEmpty()) {
+                throw new Exception("Server ports list cannot be empty");
+            }
+
+            Set<Integer> uniquePortsInServer = new HashSet<>();
+            for (Integer port : server.getPorts()) {
+                if (port <= 0 || port > 65535) {
+                    throw new Exception("Invalid port number: " + port);
+                }
+                if (!uniquePortsInServer.add(port)) {
+                    throw new Exception("Duplicate port " + port + " configured for server " + server.getServerName());
+                }
+
+                String hostPortNameKey = server.getHost() + ":" + port + ":" + (server.getServerName() != null ? server.getServerName().trim() : "");
+                if (!serverKeys.add(hostPortNameKey)) {
+                    throw new Exception("Conflict: Server name '" + server.getServerName() + "' is configured multiple times on port " + port);
+                }
+
+                if (server.getDefaultServer()) {
+                    if (portHasDefault.containsKey(port)) {
+                        throw new Exception("Conflict: Multiple default servers configured for port " + port);
+                    }
+                    portHasDefault.put(port, true);
+                }
+            }
+
+            if (server.getRoutes() != null) {
+                Set<String> routePaths = new HashSet<>();
+                for (RouteConfig route : server.getRoutes()) {
+                    if (route.getPath() == null || route.getPath().trim().isEmpty()) {
+                        throw new Exception("Route path cannot be empty");
+                    }
+                    if (!routePaths.add(route.getPath())) {
+                        throw new Exception("Duplicate route path '" + route.getPath() + "' in server " + server.getServerName());
+                    }
+                    if (route.getMethods() == null || route.getMethods().isEmpty()) {
+                        throw new Exception("Route " + route.getPath() + " must allow at least one method");
+                    }
+                    if (route.hasCgi()) {
+                        for (Map.Entry<String, String> cgiEntry : route.getCgi().entrySet()) {
+                            if (cgiEntry.getKey() == null || cgiEntry.getKey().trim().isEmpty()) {
+                                                    throw new Exception("CGI extension cannot be empty");
+                            }
+                            if (cgiEntry.getValue() == null || cgiEntry.getValue().trim().isEmpty()) {
+                                                    throw new Exception("CGI interpreter cannot be empty");
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

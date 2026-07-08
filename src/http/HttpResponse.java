@@ -9,6 +9,7 @@ public class HttpResponse {
     private Map<String, String> headers;
     private Map<String, String> cookies;
     private byte[] body;
+    private java.io.File file = null;
     private boolean isHeadersSent = false;
 
     public HttpResponse() {
@@ -49,12 +50,20 @@ public class HttpResponse {
     }
 
     public void addCookie(String name, String value) {
-        cookies.put(name, value);
+        cookies.put(name, name + "=" + value + "; Path=/");
     }
 
     public void addCookie(String name, String value, long maxAge) {
-        String cookie = name + "=" + value + "; Max-Age=" + maxAge;
+        String cookie = name + "=" + value + "; Path=/; Max-Age=" + maxAge;
         cookies.put(name, cookie);
+    }
+
+    public java.io.File getFile() {
+        return file;
+    }
+
+    public void setFile(java.io.File file) {
+        this.file = file;
     }
 
     public byte[] getBody() {
@@ -72,6 +81,11 @@ public class HttpResponse {
     }
 
     public byte[] toBytes() {
+        if (!headers.containsKey("content-length") && !headers.containsKey("transfer-encoding")) {
+            long len = (file != null) ? file.length() : body.length;
+            headers.put("content-length", String.valueOf(len));
+        }
+
         StringBuilder statusLine = new StringBuilder();
         statusLine.append("HTTP/1.1 ").append(statusCode).append(" ").append(statusMessage).append("\r\n");
 

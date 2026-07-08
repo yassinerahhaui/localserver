@@ -272,7 +272,10 @@ public class SimpleJsonParser {
         sizeStr = sizeStr.trim().toUpperCase();
         long multiplier = 1;
 
-        if (sizeStr.endsWith("MB")) {
+        if (sizeStr.endsWith("GB")) {
+            multiplier = 1024 * 1024 * 1024L;
+            sizeStr = sizeStr.substring(0, sizeStr.length() - 2).trim();
+        } else if (sizeStr.endsWith("MB")) {
             multiplier = 1024 * 1024;
             sizeStr = sizeStr.substring(0, sizeStr.length() - 2).trim();
         } else if (sizeStr.endsWith("KB")) {

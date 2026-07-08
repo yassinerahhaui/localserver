@@ -1,6 +1,7 @@
 package error;
 
 import http.HttpResponse;
+import http.HttpRequest;
 import config.ServerConfig;
 
 import java.io.IOException;
@@ -8,6 +9,34 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 public class ErrorHandler {
+
+    public static HttpResponse handleError(ServerConfig serverConfig, int statusCode, String defaultMessage, HttpRequest request) {
+        boolean preferText = false;
+        if (request != null) {
+            String accept = request.getHeader("accept");
+            String requestedWith = request.getHeader("x-requested-with");
+            String contentType = request.getHeader("content-type");
+            String method = request.getMethod();
+            String uri = request.getUri();
+            
+            if ((accept != null && (accept.contains("application/json") || accept.contains("text/plain")))
+                    || "XMLHttpRequest".equalsIgnoreCase(requestedWith)
+                    || (method != null && method.equalsIgnoreCase("POST") && contentType != null && contentType.contains("multipart/form-data"))
+                    || (uri != null && (uri.startsWith("/upload") || uri.contains("/upload")))) {
+                preferText = true;
+            }
+        }
+
+        if (preferText) {
+            HttpResponse response = new HttpResponse();
+            response.setStatusCode(statusCode);
+            response.setHeader("content-type", "text/plain");
+            response.setBody(statusCode + " " + defaultMessage);
+            return response;
+        }
+
+        return handleError(serverConfig, statusCode, defaultMessage);
+    }
 
     public static HttpResponse handleError(ServerConfig serverConfig, int statusCode, String defaultMessage) {
         HttpResponse response = new HttpResponse();
@@ -19,7 +48,11 @@ public class ErrorHandler {
             String errorPagePath = serverConfig.getErrorPages().get(String.valueOf(statusCode));
             if (errorPagePath != null) {
                 try {
-                    byte[] content = Files.readAllBytes(Paths.get(errorPagePath));
+                    String resolvedPath = errorPagePath;
+                    if (resolvedPath.startsWith("/")) {
+                        resolvedPath = "." + resolvedPath;
+                    }
+                    byte[] content = Files.readAllBytes(Paths.get(resolvedPath));
                     response.setBody(content);
                     return response;
                 } catch (IOException e) {

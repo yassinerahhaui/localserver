@@ -2,6 +2,8 @@ package handlers;
 
 import http.HttpRequest;
 import http.HttpResponse;
+import config.ServerConfig;
+import error.ErrorHandler;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -34,10 +36,18 @@ public class StaticFileHandler {
     }
 
     public static HttpResponse handleRequest(HttpRequest request, String root, String defaultFile) {
-        return handleRequest(request, root, defaultFile, null);
+        return handleRequest(null, request, root, defaultFile, null, false);
     }
 
     public static HttpResponse handleRequest(HttpRequest request, String root, String defaultFile, String relativePath) {
+        return handleRequest(null, request, root, defaultFile, relativePath, false);
+    }
+
+    public static HttpResponse handleRequest(HttpRequest request, String root, String defaultFile, String relativePath, Boolean directoryListing) {
+        return handleRequest(null, request, root, defaultFile, relativePath, directoryListing);
+    }
+
+    public static HttpResponse handleRequest(ServerConfig serverConfig, HttpRequest request, String root, String defaultFile, String relativePath, Boolean directoryListing) {
         HttpResponse response = new HttpResponse();
 
         String path;
@@ -67,24 +77,25 @@ public class StaticFileHandler {
         // Security check: ensure file is within root
         String canonicalRoot = canonicalizePath(root);
         if (!filePath.startsWith(canonicalRoot)) {
-            response.setStatusCode(403);
-            response.setBody("Forbidden");
-            return response;
+            return ErrorHandler.handleError(serverConfig, 403, "Forbidden", request);
         }
 
         File file = new File(filePath);
 
         // If it's a directory, look for default file
         if (file.isDirectory()) {
-            if (defaultFile != null) {
+            if (defaultFile != null && !defaultFile.isEmpty()) {
                 File defaultFilePath = new File(filePath + File.separator + defaultFile);
                 if (defaultFilePath.exists() && defaultFilePath.isFile()) {
                     return serveFile(response, defaultFilePath);
                 }
             }
-            response.setStatusCode(404);
-            response.setBody("Not Found");
-            return response;
+            
+            if (directoryListing != null && directoryListing) {
+                return serveDirectoryListing(response, file, request);
+            }
+
+            return ErrorHandler.handleError(serverConfig, 404, "Not Found", request);
         }
 
 
@@ -93,26 +104,77 @@ public class StaticFileHandler {
             return serveFile(response, file);
         }
 
-        response.setStatusCode(404);
-        response.setBody("Not Found");
+        return ErrorHandler.handleError(serverConfig, 404, "Not Found", request);
+    }
+
+    private static HttpResponse serveDirectoryListing(HttpResponse response, File directory, HttpRequest request) {
+        File[] files = directory.listFiles();
+        if (files == null) {
+            response.setStatusCode(500);
+            response.setBody("Internal Server Error: Cannot list directory");
+            return response;
+        }
+
+        String acceptHeader = request.getHeader("accept");
+        boolean wantJson = (acceptHeader != null && acceptHeader.contains("application/json")) 
+                || "json".equals(request.getQueryParam("format"));
+
+        if (wantJson) {
+            StringBuilder json = new StringBuilder("[");
+            boolean first = true;
+            for (File f : files) {
+                if (!first) {
+                    json.append(",");
+                }
+                json.append("{\"name\":\"").append(f.getName()).append("\",");
+                json.append("\"isDir\":").append(f.isDirectory()).append(",");
+                json.append("\"size\":").append(f.isDirectory() ? 0 : f.length()).append("}");
+                first = false;
+            }
+            json.append("]");
+            response.setStatusCode(200);
+            response.setHeader("content-type", "application/json");
+            response.setBody(json.toString().getBytes());
+        } else {
+            // Serve a beautiful HTML page listing files
+            StringBuilder html = new StringBuilder();
+            html.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Index of ").append(directory.getName()).append("</title>");
+            html.append("<style>body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8f9fa; color: #333; padding: 40px; } ");
+            html.append("h1 { color: #1e3c72; border-bottom: 2px solid #61dafb; padding-bottom: 10px; } ");
+            html.append("ul { list-style: none; padding: 0; } ");
+            html.append("li { margin: 12px 0; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; } ");
+            html.append("a { color: #2a5298; text-decoration: none; font-weight: bold; } a:hover { color: #61dafb; } ");
+            html.append(".meta { color: #888; font-size: 0.9rem; }</style></head><body>");
+            html.append("<h1>Index of ").append(directory.getName()).append("</h1><ul>");
+            String requestPath = request.getPath();
+            if (!requestPath.endsWith("/")) {
+                requestPath += "/";
+            }
+            html.append("<li><a href=\"").append(requestPath).append("../\">📁 .. (Parent Directory)</a></li>");
+            for (File f : files) {
+                String name = f.getName();
+                html.append("<li>");
+                html.append("<a href=\"").append(requestPath).append(name).append(f.isDirectory() ? "/" : "").append("\">");
+                html.append(f.isDirectory() ? "📁 " : "📄 ").append(name).append("</a>");
+                if (!f.isDirectory()) {
+                    html.append("<span class=\"meta\">").append(f.length()).append(" bytes</span>");
+                }
+                html.append("</li>");
+            }
+            html.append("</ul></body></html>");
+            response.setStatusCode(200);
+            response.setHeader("content-type", "text/html");
+            response.setBody(html.toString().getBytes());
+        }
         return response;
     }
 
     private static HttpResponse serveFile(HttpResponse response, File file) {
-        try {
-            byte[] content = Files.readAllBytes(file.toPath());
-            String mimeType = getMimeType(file.getName());
-            
-            response.setStatusCode(200);
-            response.setHeader("content-type", mimeType);
-            response.setBody(content);
-            
-            return response;
-        } catch (IOException e) {
-            response.setStatusCode(500);
-            response.setBody("Internal Server Error");
-            return response;
-        }
+        String mimeType = getMimeType(file.getName());
+        response.setStatusCode(200);
+        response.setHeader("content-type", mimeType);
+        response.setFile(file);
+        return response;
     }
 
     private static String getMimeType(String filename) {

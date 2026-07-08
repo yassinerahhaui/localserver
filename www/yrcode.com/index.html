@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YRCode - Development & Programming Resources</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -11,7 +12,7 @@
             box-sizing: border-box;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: #333;
             line-height: 1.6;
@@ -180,6 +181,318 @@
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
         }
+
+        /* YRCode Image Studio Styles */
+        .studio-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            margin-top: 1.5rem;
+        }
+        @media (min-width: 768px) {
+            .studio-container {
+                grid-template-columns: 320px 1fr;
+            }
+        }
+        
+        .upload-zone {
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            height: fit-content;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #2a5298;
+            background: #f1f5f9;
+            box-shadow: 0 10px 25px rgba(42, 82, 152, 0.1);
+            transform: translateY(-2px);
+        }
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .upload-zone h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e3c72;
+            margin-bottom: 0.5rem;
+        }
+        .upload-zone p {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-bottom: 1.5rem;
+        }
+        .upload-limits {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        
+        /* Progress Bar */
+        .progress-container {
+            display: none;
+            width: 100%;
+            margin-top: 1.5rem;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #61dafb 0%, #2a5298 100%);
+            border-radius: 3px;
+            transition: width 0.1s ease;
+        }
+        .progress-text {
+            font-size: 0.8rem;
+            color: #2a5298;
+            font-weight: 500;
+        }
+
+        /* Gallery Grid */
+        .gallery-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .gallery-container h3 {
+            font-size: 1.3rem;
+            color: #1e3c72;
+            border-bottom: 2px solid rgba(97, 218, 251, 0.2);
+            padding-bottom: 0.5rem;
+        }
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1.5rem;
+        }
+        .gallery-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 1;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .gallery-item:hover {
+            transform: scale(1.03) translateY(-4px);
+            box-shadow: 0 12px 20px rgba(0,0,0,0.15);
+        }
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: filter 0.3s;
+        }
+        .gallery-item:hover img {
+            filter: brightness(0.7);
+        }
+        
+        .gallery-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 60%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 1rem;
+            color: white;
+            pointer-events: none;
+        }
+        .gallery-item:hover .gallery-overlay {
+            opacity: 1;
+        }
+        .gallery-filename {
+            font-size: 0.85rem;
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .gallery-meta {
+            font-size: 0.75rem;
+            color: #cbd5e1;
+        }
+        
+        .gallery-actions {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+        .gallery-item:hover .gallery-actions {
+            opacity: 1;
+        }
+        .action-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .action-btn:hover {
+            transform: scale(1.1);
+        }
+        .btn-delete {
+            color: #ef4444;
+        }
+        .btn-delete:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .no-images {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px dashed #e2e8f0;
+            text-align: center;
+            color: #64748b;
+        }
+        .empty-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #94a3b8;
+        }
+
+        /* Lightbox Overlay */
+        .lightbox {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .lightbox.active {
+            display: flex;
+            opacity: 1;
+        }
+        .lightbox-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 85%;
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .lightbox.active .lightbox-content {
+            transform: scale(1);
+        }
+        .lightbox-img {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 3px solid rgba(255, 255, 255, 0.1);
+        }
+        .lightbox-caption {
+            color: white;
+            margin-top: 1rem;
+            font-size: 1rem;
+            font-weight: 500;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .lightbox-close {
+            position: absolute;
+            top: -2.5rem;
+            right: 0;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .lightbox-close:hover {
+            transform: scale(1.2);
+            color: #61dafb;
+        }
+
+        /* Non-Image File Card Styling */
+        .non-image-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0;
+        }
+        .file-icon-large {
+            font-size: 3.5rem;
+            margin-bottom: 0.75rem;
+            transition: transform 0.3s;
+            user-select: none;
+        }
+        .non-image-item:hover .file-icon-large {
+            transform: scale(1.15);
+        }
+        .file-name-preview {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #1e3c72;
+            text-align: center;
+            width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding: 0 5px;
+        }
     </style>
 </head>
 <body>
@@ -190,6 +503,7 @@
                 <a href="#about">About</a>
                 <a href="#resources">Resources</a>
                 <a href="#guides">Guides</a>
+                <a href="#gallery">Gallery</a>
                 <a href="#contact">Contact</a>
             </div>
         </div>
@@ -279,17 +593,53 @@
             <p style="margin-top: 1rem;"><strong>Access the server:</strong></p>
             <div class="code-block">curl http://localhost:8080</div>
 
-            <p style="margin-top: 1.5rem;"><strong>Key Features:</strong></p>
-            <ul style="margin-left: 2rem; margin-top: 1rem;">
-                <li>Non-blocking I/O with Java NIO Selector</li>
-                <li>Configuration-based routing</li>
-                <li>Static file serving with MIME type detection</li>
-                <li>CGI script execution (Python, Bash)</li>
-                <li>Session and cookie management</li>
-                <li>Custom error pages</li>
-                <li>Multi-port and multi-server support</li>
-                <li>Admin dashboard with metrics</li>
             </ul>
+        </div>
+
+        <!-- Image Upload & Gallery Studio Section -->
+        <div class="section" id="gallery">
+            <h2>YRCode File Studio</h2>
+            <p style="margin-bottom: 2rem; color: #666;">Upload your files directly to the server and manage them in real-time in this interactive showcase.</p>
+            
+            <div class="studio-container">
+                <!-- Upload Panel -->
+                <div class="upload-zone" id="dropZone">
+                    <div class="upload-icon">📤</div>
+                    <h3>Drag & Drop File Here</h3>
+                    <p>or click to browse files</p>
+                    <span class="upload-limits">Upload limit: Unlimited (Any file type)</span>
+                    <input type="file" id="fileInput" style="display: none;">
+                    
+                    <!-- Progress Container -->
+                    <div class="progress-container" id="progressContainer">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <span class="progress-text" id="progressText">Uploading... 0%</span>
+                    </div>
+                </div>
+
+                <!-- Live Gallery Grid -->
+                <div class="gallery-container">
+                    <h3>Server Image Library</h3>
+                    <div class="gallery-grid" id="galleryGrid">
+                        <!-- Dynamic items loaded here -->
+                    </div>
+                    <div id="noImages" class="no-images">
+                        <div class="empty-icon">🖼️</div>
+                        <p>No images uploaded yet. Drag and drop an image above to start!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Glassmorphic Lightbox Overlay -->
+        <div class="lightbox" id="lightbox">
+            <button class="lightbox-close" id="lightboxClose">&times;</button>
+            <div class="lightbox-content">
+                <img class="lightbox-img" id="lightboxImg" src="" alt="Enlarged Preview">
+                <div class="lightbox-caption" id="lightboxCaption"></div>
+            </div>
         </div>
 
         <div class="section" id="contact">
@@ -308,5 +658,318 @@
         <p>&copy; 2024 YRCode - Your Resource for Code. All rights reserved.</p>
         <p style="font-size: 0.9rem; margin-top: 0.5rem;">Powered by Custom Java HTTP Server</p>
     </footer>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const galleryGrid = document.getElementById('galleryGrid');
+        const noImages = document.getElementById('noImages');
+
+        // Click to browse
+        dropZone.addEventListener('click', (e) => {
+            if (e.target !== fileInput && !e.target.closest('.progress-container')) {
+                fileInput.click();
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                uploadFile(fileInput.files[0]);
+            }
+        });
+
+        // Drag & Drop
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        });
+
+        // Upload File
+        function uploadFile(file) {
+            progressContainer.style.display = 'flex';
+            progressFill.style.width = '0%';
+            progressText.textContent = 'Uploading... 0%';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload', true);
+            
+            xhr.setRequestHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    progressFill.style.width = percent + '%';
+                    progressText.textContent = `Uploading... ${percent}%`;
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status === 201 || xhr.status === 200) {
+                    progressText.textContent = 'Success!';
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                        fileInput.value = '';
+                        loadGallery();
+                    }, 1000);
+                } else {
+                    progressText.textContent = 'Upload failed!';
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                    }, 2000);
+                    alert(`Upload failed with status: ${xhr.status} - ${xhr.responseText}`);
+                }
+            };
+
+            xhr.onerror = () => {
+                progressText.textContent = 'Network Error!';
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 2000);
+                alert('Network error occurred during upload.');
+            };
+
+            xhr.send(file);
+        }
+
+        // Format file size
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Check if file is image
+        function isImage(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            return ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(ext);
+        }
+
+        // Get file type icon
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            switch (ext) {
+                case 'pdf': return '📕';
+                case 'zip':
+                case 'rar':
+                case 'tar':
+                case 'gz':
+                case '7z': return '📦';
+                case 'mp3':
+                case 'wav':
+                case 'ogg': return '🎵';
+                case 'mp4':
+                case 'avi':
+                case 'mov':
+                case 'webm': return '🎥';
+                case 'txt':
+                case 'md': return '📝';
+                case 'json':
+                case 'js':
+                case 'html':
+                case 'css':
+                case 'py':
+                case 'java':
+                case 'sh': return '💻';
+                default: return '📄';
+            }
+        }
+
+        // Load Gallery/Library
+        function loadGallery() {
+            fetch('/upload', {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Could not fetch upload directory listing');
+                return res.json();
+            })
+            .then(files => {
+                galleryGrid.innerHTML = '';
+                
+                // Filter out directories
+                const fileList = files.filter(f => !f.isDir);
+
+                if (fileList.length === 0) {
+                    noImages.style.display = 'flex';
+                    return;
+                }
+
+                noImages.style.display = 'none';
+
+                fileList.forEach(file => {
+                    const item = document.createElement('div');
+                    item.className = 'gallery-item';
+                    
+                    const fileUrl = `/upload/${file.name}`;
+                    const imgCheck = isImage(file.name);
+
+                    if (imgCheck) {
+                        const imageEl = document.createElement('img');
+                        imageEl.src = imgUrl = fileUrl;
+                        imageEl.alt = file.name;
+                        imageEl.loading = 'lazy';
+                        item.appendChild(imageEl);
+                    } else {
+                        item.classList.add('non-image-item');
+                        
+                        const iconEl = document.createElement('div');
+                        iconEl.className = 'file-icon-large';
+                        iconEl.textContent = getFileIcon(file.name);
+                        
+                        const nameEl = document.createElement('div');
+                        nameEl.className = 'file-name-preview';
+                        nameEl.textContent = file.name;
+                        
+                        item.appendChild(iconEl);
+                        item.appendChild(nameEl);
+                    }
+                    
+                    const actions = document.createElement('div');
+                    actions.className = 'gallery-actions';
+                    
+                    // Download Button
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'action-btn';
+                    downloadBtn.title = 'Download File';
+                    downloadBtn.innerHTML = '⬇️';
+                    downloadBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const link = document.createElement('a');
+                        link.href = fileUrl;
+                        link.download = file.name;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    });
+                    
+                    // Delete Button
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'action-btn btn-delete';
+                    deleteBtn.title = 'Delete File';
+                    deleteBtn.innerHTML = '🗑️';
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to delete "${file.name}"?`)) {
+                            deleteImage(file.name);
+                        }
+                    });
+                    
+                    actions.appendChild(downloadBtn);
+                    actions.appendChild(deleteBtn);
+                    
+                    const overlay = document.createElement('div');
+                    overlay.className = 'gallery-overlay';
+                    
+                    const nameSpan = document.createElement('div');
+                    nameSpan.className = 'gallery-filename';
+                    nameSpan.textContent = file.name;
+                    
+                    const metaSpan = document.createElement('div');
+                    metaSpan.className = 'gallery-meta';
+                    metaSpan.textContent = formatBytes(file.size);
+                    
+                    overlay.appendChild(nameSpan);
+                    overlay.appendChild(metaSpan);
+                    
+                    item.appendChild(actions);
+                    item.appendChild(overlay);
+                    
+                    item.addEventListener('click', () => {
+                        if (imgCheck) {
+                            openLightbox(fileUrl, file.name);
+                        } else {
+                            const link = document.createElement('a');
+                            link.href = fileUrl;
+                            link.download = file.name;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                    });
+                    
+                    galleryGrid.appendChild(item);
+                });
+            })
+            .catch(err => {
+                console.error('Error loading library:', err);
+                galleryGrid.innerHTML = '';
+                noImages.style.display = 'flex';
+                noImages.querySelector('p').textContent = 'Failed to load library from server.';
+            });
+        }
+
+        // Delete File
+        function deleteImage(filename) {
+            fetch(`/upload/${filename}`, {
+                method: 'DELETE'
+            })
+            .then(res => {
+                if (res.status === 204 || res.ok) {
+                    loadGallery();
+                } else {
+                    alert('Failed to delete file.');
+                }
+            })
+            .catch(err => {
+                console.error('Error deleting file:', err);
+                alert('Network error occurred while deleting file.');
+            });
+        }
+
+        // Lightbox Functions
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightboxImg');
+        const lightboxCaption = document.getElementById('lightboxCaption');
+        const lightboxClose = document.getElementById('lightboxClose');
+
+        function openLightbox(url, name) {
+            lightboxImg.src = url;
+            lightboxCaption.textContent = name;
+            lightbox.classList.add('active');
+        }
+
+        function closeLightbox() {
+            lightbox.classList.remove('active');
+            setTimeout(() => {
+                lightboxImg.src = '';
+            }, 300);
+        }
+
+        lightboxClose.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox || e.target.closest('.lightbox-close')) {
+                closeLightbox();
+            }
+        });
+        
+        document.addEventListener('DOMContentLoaded', loadGallery);
+    </script>
 </body>
 </html>

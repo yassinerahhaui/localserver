@@ -6,13 +6,10 @@ import config.RouteConfig;
 
 import java.io.*;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 public class CgiHandler {
 
-    public static HttpResponse handleCgiRequest(HttpRequest request, RouteConfig route, String root) {
-        HttpResponse response = new HttpResponse();
-
+    public static Process startCgiProcess(HttpRequest request, RouteConfig route, String root, String host, int port) throws Exception {
         String path = request.getPath();
         if (path.startsWith(route.getPath())) {
             path = path.substring(route.getPath().length());
@@ -27,98 +24,51 @@ public class CgiHandler {
 
         String interpreter = route.getCgiInterpreter(extension);
         if (interpreter == null) {
-            response.setStatusCode(403);
-            response.setBody("CGI execution not allowed");
-            return response;
+            throw new Exception("403 Forbidden: CGI extension not allowed");
         }
 
-        try {
-            File scriptFile = new File(filePath);
-            if (!scriptFile.exists()) {
-                response.setStatusCode(404);
-                response.setBody("Script not found");
-                return response;
-            }
-
-            ProcessBuilder pb = new ProcessBuilder(interpreter, scriptFile.getAbsolutePath());
-
-            Map<String, String> env = pb.environment();
-            env.put("REQUEST_METHOD", request.getMethod());
-            env.put("QUERY_STRING", extractQueryString(request.getUri()));
-            env.put("PATH_INFO", request.getPath());
-            env.put("SCRIPT_NAME", route.getPath());
-            env.put("SERVER_NAME", "localhost");
-            env.put("SERVER_PORT", "8080"); 
-            env.put("SERVER_PROTOCOL", request.getHttpVersion());
-            env.put("CONTENT_LENGTH", String.valueOf(request.getBody().length));
-            env.put("CONTENT_TYPE", request.getContentType() != null ? request.getContentType() : "");
-
-            for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
-                String cgVar = "HTTP_" + header.getKey().toUpperCase().replace("-", "_");
-                env.put(cgVar, header.getValue());
-            }
-
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-
-            if (request.getBody().length > 0) {
-                try (OutputStream stdin = process.getOutputStream()) {
-                    stdin.write(request.getBody());
-                }
-            }
-
-            ByteArrayOutputStream result = new ByteArrayOutputStream();
-            try (InputStream stdout = process.getInputStream()) {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                
-                boolean finished = false;
-                long endTime = System.currentTimeMillis() + 500; 
-
-                while (System.currentTimeMillis() < endTime) {
-                    while (stdout.available() > 0 && (bytesRead = stdout.read(buffer)) != -1) {
-                        result.write(buffer, 0, bytesRead);
-                    }
-                    
-                    try {
-                        process.exitValue();
-                        finished = true;
-                        
-                        while ((bytesRead = stdout.read(buffer)) != -1) {
-                            result.write(buffer, 0, bytesRead);
-                        }
-                        break;
-                    } catch (IllegalThreadStateException e) {
-                        Thread.sleep(10);
-                    }
-                }
-
-                if (!finished) {
-                    process.destroyForcibly();
-                    response.setStatusCode(504);
-                    response.setBody("Gateway Timeout");
-                    return response;
-                }
-            }
-
-            int exitCode = process.exitValue();
-            if (exitCode != 0) {
-                response.setStatusCode(500);
-                response.setBody("CGI Script Error (exit code: " + exitCode + ")");
-                return response;
-            }
-
-            parseCgiResponse(response, result.toByteArray());
-            return response;
-
-        } catch (Exception e) {
-            response.setStatusCode(500);
-            response.setBody("Internal Server Error");
-            return response;
+        File scriptFile = new File(filePath);
+        if (!scriptFile.exists()) {
+            throw new Exception("404 Not Found: Script not found");
         }
+
+        ProcessBuilder pb = new ProcessBuilder(interpreter, scriptFile.getAbsolutePath());
+        
+        // Ensure correct relative path handling by running process in script's parent directory
+        pb.directory(scriptFile.getParentFile());
+
+        Map<String, String> env = pb.environment();
+        env.put("REQUEST_METHOD", request.getMethod());
+        env.put("QUERY_STRING", extractQueryString(request.getUri()));
+        env.put("PATH_INFO", scriptFile.getAbsolutePath());
+        env.put("SCRIPT_NAME", route.getPath() + (route.getPath().endsWith("/") ? "" : "/") + path);
+        env.put("SERVER_NAME", host != null ? host : "localhost");
+        env.put("SERVER_PORT", String.valueOf(port));
+        env.put("SERVER_PROTOCOL", request.getHttpVersion());
+        env.put("CONTENT_LENGTH", String.valueOf(request.getBody().length));
+        env.put("CONTENT_TYPE", request.getContentType() != null ? request.getContentType() : "");
+
+        for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
+            String cgVar = "HTTP_" + header.getKey().toUpperCase().replace("-", "_");
+            env.put(cgVar, header.getValue());
+        }
+
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+
+        if (request.getBody().length > 0) {
+            try (OutputStream stdin = process.getOutputStream()) {
+                stdin.write(request.getBody());
+                stdin.flush();
+            }
+        } else {
+            process.getOutputStream().close();
+        }
+
+        return process;
     }
 
-    private static void parseCgiResponse(HttpResponse response, byte[] output) {
+    public static void parseCgiResponse(HttpResponse response, byte[] output) {
         String outputStr = new String(output);
         int doubleNewlineIndex = outputStr.indexOf("\r\n\r\n");
         if (doubleNewlineIndex < 0) {
@@ -127,7 +77,7 @@ public class CgiHandler {
 
         if (doubleNewlineIndex > 0) {
             String headerPart = outputStr.substring(0, doubleNewlineIndex);
-            String bodyPart = outputStr.substring(doubleNewlineIndex + 4);
+            String bodyPart = outputStr.substring(doubleNewlineIndex + (outputStr.indexOf("\r\n\r\n") >= 0 ? 4 : 2));
 
             String[] headerLines = headerPart.split("\r?\n");
             for (String line : headerLines) {
